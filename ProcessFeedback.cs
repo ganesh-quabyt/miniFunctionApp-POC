@@ -29,16 +29,15 @@ public class ProcessFeedback
         }
 
         // Extract container and blob name
-        var parts = request.BlobPath.Trim('/').Split('/', 2);
+        var parts = request.ContainerName.Trim('/').Split('/', 2);
         string containerName = parts[0];
-        string blobName = parts[1];
 
         var blobClient = new BlobContainerClient("UseDevelopmentStorage=true", containerName);
-        var blob = blobClient.GetBlobClient(blobName);
+        var blob = blobClient.GetBlobClient(containerName);
 
         if (!await blob.ExistsAsync())
         {
-            _logger.LogError($"Blob not found: {blobName}");
+            _logger.LogError($"Blob not found: {containerName}");
             return;
         }
 
@@ -55,7 +54,7 @@ public class ProcessFeedback
             PartitionKey = "feedback",
             RowKey = Guid.NewGuid().ToString(),
             FileName = request.FileName,
-            BlobPath = request.BlobPath,
+            ContainerName= request.ContainerName,
             Content = content
         };
 

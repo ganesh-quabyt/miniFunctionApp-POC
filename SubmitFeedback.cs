@@ -1,11 +1,10 @@
-using Azure.Storage.Queues; 
+using Azure.Storage.Queues;
 using FeedbackProcessor.Models;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using System.Net;
+using System.Text;
 using System.Text.Json;
 
 
@@ -43,16 +42,17 @@ public class SubmitFeedback
 
         var body = await JsonSerializer.DeserializeAsync<FeedbackRequest>(req.Body);
 
-        if (body == null || string.IsNullOrWhiteSpace(body.FileName) || string.IsNullOrWhiteSpace(body.BlobPath))
+        if (body == null || string.IsNullOrWhiteSpace(body.FileName) || string.IsNullOrWhiteSpace(body.ContainerName))
         {
-            return new BadRequestObjectResult("Invalid request body. 'FileName' and 'BlobPath' are required.");
+            return new BadRequestObjectResult("Invalid request body. 'FileName' and 'ContainerName' are required.");
         }
 
         var messageJson = JsonSerializer.Serialize(body);
 
         try
         {
-            await _queueClient.SendMessageAsync(messageJson);
+            var bytes =Encoding.UTF8.GetBytes(messageJson);
+            var response = await _queueClient.SendMessageAsync(Convert.ToBase64String(bytes));
             _logger.LogInformation("Message successfully sent to feedback-queue.");
         }
         catch (Exception ex)
@@ -60,10 +60,9 @@ public class SubmitFeedback
             _logger.LogError($"Error sending message: {ex.Message}");
         }
 
-        
+
         return new OkObjectResult("Message added to queue");
-       
+
 
     }
 }
-

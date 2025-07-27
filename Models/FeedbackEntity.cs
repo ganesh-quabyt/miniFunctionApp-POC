@@ -10,7 +10,7 @@ namespace FeedbackProcessor.Models
         public string RowKey { get; set; } = Guid.NewGuid().ToString();
 
         public string FileName { get; set; }
-        public string BlobPath { get; set; }
+        public string ContainerName { get; set; }
         public string Content { get; set; }
 
         public ETag ETag { get; set; }

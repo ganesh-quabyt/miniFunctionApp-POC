@@ -29,15 +29,15 @@ public class ProcessFeedback
         }
 
         // Extract container and blob name
-        var parts = request.ContainerName.Trim('/').Split('/', 2);
-        string containerName = parts[0];
+        var containerName = request.ContainerName;
+
 
         var blobClient = new BlobContainerClient("UseDevelopmentStorage=true", containerName);
-        var blob = blobClient.GetBlobClient(containerName);
+        var blob = blobClient.GetBlobClient(request.FileName);
 
         if (!await blob.ExistsAsync())
         {
-            _logger.LogError($"Blob not found: {containerName}");
+            _logger.LogError($"Blob not found: {request.FileName}");
             return;
         }
 

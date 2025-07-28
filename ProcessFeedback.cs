@@ -9,18 +9,11 @@ public class ProcessFeedback
 {
 
     [Function("ProcessFeedback")]
-    public async Task Run([QueueTrigger("feedback-queue", Connection = "AzureWebJobsStorage")] string queueMessage, FunctionContext context)
+    public async Task Run([QueueTrigger("feedback-queue", Connection = "AzureWebJobsStorage")] FeedbackRequest request, FunctionContext context)
     {
         var logger = context.GetLogger("ProcessFeedback");
-        logger.LogInformation($"ProcessFeedback triggered. Message: {queueMessage}");
+        logger.LogInformation($"ProcessFeedback triggered. Message: {request}");
 
-        if (string.IsNullOrWhiteSpace(queueMessage))
-        {
-            logger.LogError("Queue message is empty or null.");
-            return;
-        }
-
-        var request = JsonSerializer.Deserialize<FeedbackRequest>(queueMessage);
         try
         {
 

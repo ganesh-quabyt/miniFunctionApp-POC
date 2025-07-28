@@ -1,64 +1,64 @@
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
-using Azure.Storage.Queues.Models;
 using FeedbackProcessor.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using System.Text.Json;
 
 public class ProcessFeedback
 {
-    private readonly ILogger _logger;
-
-    public ProcessFeedback(ILoggerFactory loggerFactory)
-    {
-        _logger = loggerFactory.CreateLogger<ProcessFeedback>();
-    }
 
     [Function("ProcessFeedback")]
-    public async Task Run([QueueTrigger("feedback-queue", Connection = "AzureWebJobsStorage")] string queueMessage)
+    public async Task Run([QueueTrigger("feedback-queue", Connection = "AzureWebJobsStorage")] string queueMessage, FunctionContext context)
     {
-        _logger.LogInformation($"ProcessFeedback triggered. Message: {queueMessage}");
+        var logger = context.GetLogger("ProcessFeedback");
+        logger.LogInformation($"ProcessFeedback triggered. Message: {queueMessage}");
+
+        if (string.IsNullOrWhiteSpace(queueMessage))
+        {
+            logger.LogError("Queue message is empty or null.");
+            return;
+        }
 
         var request = JsonSerializer.Deserialize<FeedbackRequest>(queueMessage);
-        if (request == null)
+        try
         {
-            _logger.LogError("Invalid queue message format.");
-            return;
+
+            if (request != null)
+            {
+                var blobClient = new BlobContainerClient("UseDevelopmentStorage=true", request.ContainerName);
+                var blob = blobClient.GetBlobClient(request.FileName);
+
+                if (!await blob.ExistsAsync())
+                {
+                    logger.LogError($"Blob not found: {request.FileName}");
+                    return;
+                }
+
+                var download = await blob.DownloadContentAsync();
+                string content = download.Value.Content.ToString();
+
+                logger.LogInformation($"Blob content: {content}");
+
+                var tableClient = new TableClient("UseDevelopmentStorage=true", "FeedbackTable");
+                await tableClient.CreateIfNotExistsAsync();
+
+                var entity = new FeedbackEntity
+                {
+                    PartitionKey = "feedback",
+                    RowKey = Guid.NewGuid().ToString(),
+                    FileName = request.FileName,
+                    ContainerName = request.ContainerName,
+                    Content = content
+                };
+                await tableClient.AddEntityAsync(entity);
+                logger.LogInformation("Saved feedback to table.");
+            }
         }
-
-        // Extract container and blob name
-        var containerName = request.ContainerName;
-
-
-        var blobClient = new BlobContainerClient("UseDevelopmentStorage=true", containerName);
-        var blob = blobClient.GetBlobClient(request.FileName);
-
-        if (!await blob.ExistsAsync())
+        catch (Exception)
         {
-            _logger.LogError($"Blob not found: {request.FileName}");
-            return;
+
+            throw;
         }
-
-        var download = await blob.DownloadContentAsync();
-        string content = download.Value.Content.ToString();
-
-        _logger.LogInformation($"Blob content: {content}");
-
-        var tableClient = new TableClient("UseDevelopmentStorage=true", "FeedbackTable");
-        await tableClient.CreateIfNotExistsAsync();
-
-        var entity = new FeedbackEntity
-        {
-            PartitionKey = "feedback",
-            RowKey = Guid.NewGuid().ToString(),
-            FileName = request.FileName,
-            ContainerName= request.ContainerName,
-            Content = content
-        };
-
-        await tableClient.AddEntityAsync(entity);
-        _logger.LogInformation("Saved feedback to table.");
     }
 }

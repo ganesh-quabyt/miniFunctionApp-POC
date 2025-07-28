@@ -40,7 +40,7 @@ public class SubmitFeedback
     {
         _logger.LogInformation("SubmitFeedback function triggered.");
 
-        var body = await JsonSerializer.DeserializeAsync<FeedbackRequest>(req.Body);
+        var body = await req.ReadFromJsonAsync<FeedbackRequest>();
 
         if (body == null || string.IsNullOrWhiteSpace(body.FileName) || string.IsNullOrWhiteSpace(body.ContainerName))
         {
@@ -51,18 +51,15 @@ public class SubmitFeedback
 
         try
         {
-            var bytes =Encoding.UTF8.GetBytes(messageJson);
+            var bytes = Encoding.UTF8.GetBytes(messageJson);
             var response = await _queueClient.SendMessageAsync(Convert.ToBase64String(bytes));
             _logger.LogInformation("Message successfully sent to feedback-queue.");
+            return new OkObjectResult("Message added to queue");
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error sending message: {ex.Message}");
+            throw new Exception("Failed to send message to the queue.", ex);
         }
-
-
-        return new OkObjectResult("Message added to queue");
-
-
     }
 }
